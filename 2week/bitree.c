@@ -1,0 +1,39 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+int nums[] = {10, 2, 15, 7, 13};
+
+typedef struct treenode
+{
+	int val;
+	struct treenode *left;
+	struct treenode *right;
+}treenode;
+
+void insertTreeNode(treenode** node, int val)
+{
+	if (*node == NULL) //if whats at the addr is null, make a new treenode
+	{
+		*node = malloc(sizeof(treenode)); //set value of mem location the value of malloc (addr) 
+		(*node)->val = val;
+		(*node)->left = NULL;
+		(*node)->right = NULL;
+	}
+	else
+	{
+		if (val < (*node)->val)
+			insertTreeNode(&((*node)->left), val);
+		else
+			insertTreeNode(&((*node)->right), val);
+	}
+}
+
+int main()
+{
+	treenode* root = NULL;
+	
+	for (int i = 0; i < 5; i++)
+		insertTreeNode(&root, nums[i]);
+	
+	return 0;
+}

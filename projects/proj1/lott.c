@@ -33,6 +33,7 @@ void join()
 	{
 	    	pause();
 	}
+	//printf("\t...end of join...\n");
 }
 
 //RR
@@ -43,7 +44,7 @@ void scheduler()
       	
 	if(threads == NULL)
 	{
-		printf("THREADS = NULL\n");
+		//printf("THREADS = NULL\n");
 	    	return;
       	}
 	else
@@ -56,19 +57,19 @@ void scheduler()
 		  	printf("%d ", t->tid);
 		  	t = t->next;
 	    	}
-	    	printf("\n\nTotoal tikcets: %d\n", totalTickets);
+	    	printf("\n\nTotal tickets: %d\n", totalTickets);
       	} //view of available threads when scheduler runs
 	
 	winner = rand()% (totalTickets + 1);
-	printf("winner: %d\n", winner);
-	printf("threads points to: %d\n", threads->tid);	
+	printf("Winner: %d\n", winner);
+	//printf("threads points to: %d\n\n", threads->tid);	
 
 	thread_t *chosen = threads;
 	thread_t *previous = threads;
 
 	while(chosen->ticket < winner) //finds the correct thread
 	{
-		printf("\tfinding correct thread...\n");
+		//printf("\tfinding correct thread...\n");
 		winner -= chosen->ticket;	
 		//printf("winner: %d\n", winner);
 		chosen = chosen->next;
@@ -76,42 +77,48 @@ void scheduler()
 	
 	if (chosen == threads)	//if at head of queue
 	{
-		printf("thread @ head chosen\n");
+		//printf("thread @ head chosen\n");
 		if (chosen->next != NULL)
 		{
 			threads = chosen->next;
-			printf("threads points to: %d\n", threads->tid);
+			//printf("threads points to: %d\n", threads->tid);
 			chosen->next = NULL;
 		}
 		else
 		{
-			printf("only one thing left\n");
+			//printf("only one thing left\n");
+			threads = NULL;
+			previous = NULL;
 		}
+		//printf("previous is still at threads.\n");
 	}
 	else
 	{
-		printf("not at head\n");
+		//printf("not at head\n");
 		while(previous->next != chosen) //&& chosen->next != NULL) //sets previous
 		{
-			printf("\tfinding previous...\n");
+			//printf("\tfinding previous...\n");
 			previous = previous->next;
 		}
 		if (chosen->next != NULL)
 		{
-			printf("\tsetting previous next to chosen next...\n");
+			//printf("\tsetting previous next to chosen next...\n");
 			previous->next = chosen->next;
+			//printf("\tprevious->next's tid is: %d", previous->next->tid);
 		}
 		else
 		{	
-			//previous = threads;
+			//printf("at end of queue...\n");
+			previous->next = NULL;
+			//printf("previous  is NULL.\n");
 		}
-		printf("\tprevious->next's tid is: %d", previous->next->tid);
 		chosen->next = NULL;
 	}
 	 
 	printf("\n\nThe chosen process is: %d with %d tickets!!", chosen->tid, chosen->ticket);
-      	printf("\nThe previous thread is: %d\n\n", previous->tid);
+      	
 	set_timer();
+	//printf("\nbefore schuedlereing thumbs up...\n");
       	swapcontext(&(scheduler_thread->ctx), &(chosen->ctx)); //takes current context, records state, loads context swapping to
 								//from, to
 }
@@ -200,7 +207,7 @@ void done()
 
 void test()
 {
-	printf("in thread %d\n", threads->tid);
+	//printf("in thread %d\n", threads->tid);
       	//done();
 }
 
@@ -210,8 +217,12 @@ int main()
 	thread_create(test);
       	thread_create(test);
       	thread_create(test);
-	
+	thread_create(test);
+	thread_create(test);
+
+	//printf("\nMAIN Before Join.\n");
       	join();			//makes main wait
+	printf("\n\nMAIN Completed scheduling.\n");
 
       	return 0;
 }

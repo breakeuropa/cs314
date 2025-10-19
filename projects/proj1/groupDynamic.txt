@@ -1,0 +1,25 @@
+Jo Schmidt johansc@siue.edu (Section 001)
+Isak Fagerland ifagerl@siue.edu (Section 002)
+
+What worked? 
+I am very proud of how we compartmentalized each scheduler. I had a habit in previous classes to get overwhelmed looking at the whole picture rather than bite sized
+pieces. I always enjoy working with Isak; I think we compliment each other well. We both had a decent understanding of the theory behind each scheduler and
+implemented linked lists well.
+
+What did not work?
+Our first iterations of the MLFQ was a major struggle. It took Isak rapid fireing questions to Dr. Crk in order for us to truly get a working schdeuler. However, our
+initial attempts were well rounded and certainly were headed in the right direction. The most difficult part was getting all the pieces in the right order.
+
+What were you responsible for in the project?
+I was the driving force for the lottery scheduler while Isak finished strong with the MLFQ. I drew a multitude of linked lists to explain what the threadssched.c was
+doing and how we needed to change it. I made order of operations for each scheduler, what needed to happen and where inside the scheduler function. A lot of debugging,
+especially with the lottery scheduler, happened on my end but this doesn't mean I fixed the problem every time!! Isak would take what I found, such as where at in the
+code our implementation failed, and tweak it or tell me what he thought the solution was. This happened the other way around too, with me telling Isak simmple ways to
+navigate errors. Each of us like our code to look certain ways (and Isak uses emacs while I'm still stuck in vim :)) so we each make our own projects with slightly 
+different output formats but the same methods. 
+
+What could be done differently next time?
+I think this is one of our best performances as a group. I often felt imposter syndrome when working with Isak but with this project we both expressed how much we 
+appreciate working with each other. We're both in honors so the imposter syndrome is probably to be expected... but I really am proud of how we split the work with
+this project. It came down to the wire in the end but I think we started it soon enough and simply underestimated just how much work the MLFQ scheduler would take. 
+Overall, I don't see any glaring issues I'd fix for next time, rather I am very pleased with Isak's and my teamwork. 

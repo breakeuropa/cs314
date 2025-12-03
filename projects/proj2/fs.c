@@ -3,6 +3,8 @@
 #define NUMBLOCKS (FSSIZE/BLOCKSIZE)
 #define NUMFAT NUMBLOCKS
 #define ROOT 0
+#define TYPEFILE 1
+#define TYPEDIR 2
 unsigned char* fs; 
 
 typedef struct header
@@ -58,7 +60,7 @@ void formatfs()
 	memset(fs, 0, FSSIZE);
 	struct header *h = (struct header *)fs;
 	h->fsSize = FSSIZE;
-	h->fatStart = BLOCKSIZE;
+	h->fatStart = sizeof(header);
 	h->fatSize = NUMFAT * sizeof(unsigned short);
 	h->rootStart = 0;
 
@@ -84,6 +86,19 @@ void formatfs()
 	}
 
 	fprintf(stdout, "Formatted the new filesystem! FAT[0] points to %d and Header says fat starts at %d!!!\n", FAT[0], h->fatStart);
+}
+
+
+int fatBlockFinder()
+{
+	for (int i = 0; i < NUMFAT; i++)
+	{
+		if (FAT[i] == 0)
+		{
+			return i;
+		}
+	}
+	return -1;
 }
 
 int findDirent(int start, const char *name, int *found, int *entry)
@@ -114,7 +129,7 @@ int findDirent(int start, const char *name, int *found, int *entry)
 int addDirent(int start, const dirent *new)
 {
 	int block = start;
-	int prev = -1;
+	//int prev = -1;
 
 	while(1)
 	{
@@ -148,25 +163,27 @@ int addDirent(int start, const dirent *new)
 		}
 		else
 		{
-			prev = block;
+			//prev = block;
 			block = next;
 		}
 
 	}
 }
-
-int parentTraverse(const char *path, int *parent, char *name)
+/*
+int pathTraverse(const char *path, int *parent, char *name)
 {
 	if (!path || path[0] == '\0') return -1;
 
 	char temp[strlen(path) + 1]; //copy of the path
 	strcpy(temp, path);
 
-	char *p = temp; //pointer to temp, moves past leading 
+	char *p = temp; //pointer to temp, moves past leading / 
 	if (*p == '/') p++;
 
-	int current = ((header *)fs)->rootStart; 
+	header *h = (header *)fs;
+	int current = h->rootStart; 
 	char *token = strtok(p, "/"); //first component of path (string, delimiter)
+	if (!token) return -1;
 	char *next = strtok(NULL, "/");
 
 	while (next)
@@ -186,10 +203,48 @@ int parentTraverse(const char *path, int *parent, char *name)
 	}
 	
 	strcpy(name, token);
+	name[255] = '\0';
 	*parent = current;
 	return current;
 }
+*/
 
+int pathTraverse(const char *path, char *child)
+{
+	if (!path || path[0] == '\0') return -1;
+
+        char temp[strlen(path) + 1]; //copy of the path
+        strcpy(temp, path);
+
+        //header *h = (header *)fs;
+        int current = 0;
+        char *token = strtok(temp + 1, "/"); //first component of path (string, delimiter)
+        char next[256];
+
+	while(token)
+	{
+		strcpy(next, token);
+		token = strtok(NULL, "/");
+
+		if (!token)
+		{
+			strcpy(child, next);
+			return current;
+		}
+
+		int block, entry;
+		if (!findDirent(current, next, &block, &entry))
+			return -1;
+
+		dirent *entries = (dirent *)blockPtr(block);
+                if (entries[entry].type != 2)
+                        return -1;
+
+                current = entries[entry].firstblock;
+	}
+	return -1;
+}
+/*
 int lookupDirent(const char *path)
 {
 	header *h = (header *)fs;
@@ -220,35 +275,41 @@ int lookupDirent(const char *path)
 
 	return current;
 }
-
-int makeDirectory(const char *path)
+*/
+void makeDirectory(const char *path)
 {
-	header *h = (header *)fs;
-
-	char temp[strlen(path) + 1];
-	strcpy(temp, path);
-
-	char *p = temp;
-	if (*p == '/') p++;
-
-	int current = h->rootStart;
-
-	char *token = strtok(p, "/");
-	while(token)
+	char child[256];
+	int parent = pathTraverse(path, child);
+	if (parent < 0)
 	{
-		int block, index;
-		if (!findDirent(current, token, &block, &index))
-		{
-			int newBlock = makeDirectory(
-		} 
-
-                dirent *entries = (dirent *)blockPtr(block);
-                if (entries[index].type != 2)
-                        return -1;
-
-                current = entries[index].firstBlock;
-                token = strtok(NULL, "/");
+		fprintf(stdout, "bad path\n");
+		return;
 	}
+
+	int block, entry;
+	if (findDirent(parent, child, &block, &entry))
+	{
+		fprintf(stdout, "directory is already here\n");
+		return;
+	}
+
+	int new = fatBlockFinder();
+	FAT[new] = USHRT_MAX;
+	memset(blockPtr(new), 0, BLOCKSIZE);
+	
+	dirent d;
+        memset(&d, 0, sizeof(d));
+        strcpy(d.name, child);
+	d.name[255] = '\0';
+        d.type = 2;
+        d.size = 0;
+        d.firstblock = new;
+
+	if (addDirent(parent, &d) != 0)
+	{
+		fprintf(stdout, "couldn't add directory!!!!\n");
+	}
+
 }
 
 void loadfs()
@@ -260,33 +321,31 @@ void loadfs()
 	fprintf(stdout, "Loaded filesystem with FAT starting at %p\n", h->fatStart);
 }
 
+void printChain(int start)
+{
+	int block = start;
+	int maxDirents = BLOCKSIZE / sizeof(dirent);
+
+	while (block != USHRT_MAX)
+	{
+		dirent *entries = (dirent *)blockPtr(block);
+		for (int i = 0; i < maxDirents; i++)
+		{
+			if (entries[i].name[0] != '\0')
+			{
+				fprintf(stdout,"%s \ttype: %d \tfirstblock: %d\n",entries[i].name, entries[i].type, entries[i].size, entries[i].firstblock);
+			}
+		}
+
+		block = FAT[block];
+	}
+}
 
 void lsfs()
 {
 	header *h = (header *)fs;
-	dirent *root = (dirent *)(fs + h->rootStart);
-	int maxDirents = BLOCKSIZE / sizeof(dirent);
 	fprintf(stdout, "Listing contents...\n");
-
-	for (int i = 0; i < maxDirents; i++)
-	{
-		if (root[i].name[0] != '\0')
-		{
-			fprintf(stdout, "%s \tsize: %d firstblock: %d\n", root[i].name, root[i].size, root[i].firstblock);
-		}
-	}
-}
-
-int fatBlockFinder()
-{
-	for (int i = 0; i < NUMFAT; i++)
-	{
-		if (FAT[i] == 0)
-		{
-			return i;
-		}
-	}
-	return -1;
+	printChain(h->rootStart);
 }
 
 int buildChain(int blocksNeeded)
@@ -313,7 +372,7 @@ int buildChain(int blocksNeeded)
 
 	return first;
 }
-
+/*
 void addfilefs(char* fname)
 {
 	FILE* fileToAdd = fopen(fname, "r");
@@ -362,48 +421,83 @@ void addfilefs(char* fname)
 
 	fprintf(stdout, "Added %s which used %d blocks! first block in chain: %d\n", fname, blocksNeeded, chain);
 }
+*/
+void addfilefs(char* fname)
+{
+	char child[256];
+	int parent = pathTraverse(fname, child);
 
+	if (parent < 0)
+	{
+		fprintf(stderr, "Invalid path!!!!!\n");
+	}
+
+	FILE* fileToAdd = fopen(child, "rb");
+	struct stat fstat;
+	if (stat(child, &fstat) != 0)
+	{
+		perror("stat error");
+		exit(1);
+	}
+
+	int fileSize = fstat.st_size;
+	int blocksNeeded = (fileSize + BLOCKSIZE - 1) / BLOCKSIZE;
+	int first = buildChain(blocksNeeded);
+
+	int current = first; //index of first data block
+	int remain = fileSize;	//# of bytes left
+
+	while (current != USHRT_MAX && remain > 0)
+	{
+		unsigned char *block = blockPtr(current);
+		int read = (remain < BLOCKSIZE) ? remain : BLOCKSIZE;
+
+		fread(blockPtr, 1, read, fileToAdd);
+		remain -= read;
+		current = FAT[current];
+	}
+
+	fclose(fileToAdd);
+
+	dirent d;
+	memset(&d, 0, sizeof(d));
+	strcpy(d.name, child);
+	d.name[255] = '\0';
+	d.type = 1;
+	d.size = fileSize;
+	d.firstblock = first;
+
+	if (addDirent(parent, &d) != 0)
+	{
+		fprintf(stdout, "Couldn't add file %s!!!!\n", child);
+	}
+
+	fprintf(stdout, "Added %s which used %d blocks! first block in chain: %d\n", fname, blocksNeeded, first);
+}
 
 void removefilefs(char* fname)
 {
-	char *path = strrchr(fname, '/'); //find the filename
-	if (path)
-	{
-		path++;
-	}
-	else
-	{
-		path = fname;
-	}
+	char child[256];
+	int parent = pathTraverse(fname, child);
 
-	header *h = (header *)fs;
-	dirent *root = (dirent *)(fs + h->rootStart);
+	int block, entry;
+	if (!findDirent(parent, child, &block, &entry))
+        {
+                fprintf(stdout, "file is too weird\n");
+                return;
+        }
 
-	int maxDirents = BLOCKSIZE / sizeof(dirent);
+	dirent *d = (dirent *)blockPtr(block) + entry;
 
-	int found = -1;
-	for (int i = 0; i < maxDirents; i++) //make sure fname and filename match
+	int current = d->firstblock;
+	while (current != USHRT_MAX)
 	{
-		if (root[i].name[0] != '\0' && strcmp(root[i].name, fname) == 0)
-		{
-			found = i;
-			break;
-		}
+		int next = FAT[current];
+		FAT[current] = 0;
+		current = next;
 	}
 
-	int block = root[found].firstblock;
-
-	while (block != 0 && block != -1 && block != USHRT_MAX)
-	{
-		unsigned short next = FAT[block];
-		FAT[block] = 0;
-		block = next;
-	}
-
-	root[found].name[0] = '\0';
-	root[found].type = 0;
-	root[found].size = 0;
-	root[found].firstblock = 0;
+	memset(d, 0, sizeof(dirent));
 
 	fprintf(stdout, "Removed %s\n", fname);
 
@@ -412,5 +506,30 @@ void removefilefs(char* fname)
 
 void extractfilefs(char* fname)
 {
+	char child[256];
+	int parent = pathTraverse(fname, child);
+	if (parent < 0) 
+	{
+	       	fprintf(stdout,"bad path\n"); 
+		return; 
+	}
 
+	int block, entry;
+	if (!findDirent(parent, child, &block, &entry))
+        {
+                fprintf(stdout, "file is too weird\n");
+                return;
+        }
+	
+	dirent* d = (dirent*)blockPtr(block) + entry;
+    	int current = d->firstblock;
+    	int remain = d->size;
+
+    	while (current != USHRT_MAX && remain > 0) 
+	{
+        	int chunk = (remain < BLOCKSIZE) ? remain : BLOCKSIZE;
+        	write(STDOUT_FILENO, blockPtr(current), chunk);
+        	remain -= chunk;
+        	current = FAT[current];
+    	}
 }

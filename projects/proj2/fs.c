@@ -211,7 +211,7 @@ int pathTraverse(const char *path, int *parent, char *name)
 
 int pathTraverse(const char *path, char *child)
 {
-	if (!path || path[0] == '\0') return -1;
+	if (path[0] != '/') return -1;
 
         char temp[strlen(path) + 1]; //copy of the path
         strcpy(temp, path);

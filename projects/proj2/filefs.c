@@ -14,7 +14,7 @@
 
 #include "fs.h"
 
-int zerosize(int fd);
+int zerosize(int fd, int create);
 void exitusage(char* pname);
 
 
@@ -26,17 +26,19 @@ int main(int argc, char** argv){
   int add = 0;
   int remove = 0;
   int extract = 0;
+  int makeDir = 0;
   char* toadd = NULL;
   char* toremove = NULL;
   char* toextract = NULL;
   char* fsname = NULL;
+  char* dir = NULL;
   int fd = -1;
   int newfs = 0;
   int filefsname = 0;
  
 
   
-  while ((opt = getopt(argc, argv, "la:r:e:f:")) != -1) {
+  while ((opt = getopt(argc, argv, "la:r:e:f:d:c:")) != -1) {
     switch (opt) {
     case 'l':
       list = 1;
@@ -53,6 +55,13 @@ int main(int argc, char** argv){
       filefsname = 1;
       fsname = strdup(optarg);
       break;
+    case 'd':
+      makeDir = 1;
+      dir = strdup(optarg);
+      break;
+    case 'c':
+      create = 1;
+      break;
     default:
       exitusage(argv[0]);
     }
@@ -68,7 +77,7 @@ int main(int argc, char** argv){
     exit(EXIT_FAILURE);
   }
   else{
-    if (zerosize(fd)){
+    if (zerosize(fd, create)){
       newfs = 1;
     }
     
@@ -93,6 +102,11 @@ int main(int argc, char** argv){
   }
 
   loadfs();
+
+  if (makeDir)
+  {
+	  makeDirectory(dir);
+  }
   
   if (add){
     addfilefs(toadd);
@@ -116,10 +130,10 @@ int main(int argc, char** argv){
 }
 
 
-int zerosize(int fd){
+int zerosize(int fd, int create){
   struct stat stats;
   fstat(fd, &stats);
-  if(stats.st_size == 0)
+  if(create || stats.st_size == 0)
     return 1;
   return 0;
 }

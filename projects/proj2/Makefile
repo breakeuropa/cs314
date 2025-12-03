@@ -1,2 +1,3 @@
 all:
-	gcc -g fs.c filefs.c -o filefs
+	gcc fs.c filefs.c -o simpleFAT
+	./simpleFAT

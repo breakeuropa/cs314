@@ -209,20 +209,20 @@ int pathTraverse(const char *path, int *parent, char *name)
 }
 */
 
-int pathTraverse(const char *path, char *child)
+int pathTraverse(const char *path, char *child, int *parent)
 {
-	if (path[0] != '/') return -1;
+	if (!path || path[0] != '/') return -1;
 
         char temp[strlen(path) + 1]; //copy of the path
         strcpy(temp, path);
 
-        //header *h = (header *)fs;
         int current = 0;
         char *token = strtok(temp + 1, "/"); //first component of path (string, delimiter)
-        char next[256];
+        char *next = strtok(NULL, "/");
 
-	while(token)
+	while(next)
 	{
+		/*
 		strcpy(next, token);
 		token = strtok(NULL, "/");
 
@@ -231,18 +231,34 @@ int pathTraverse(const char *path, char *child)
 			strcpy(child, next);
 			return current;
 		}
+		*/
 
 		int block, entry;
-		if (!findDirent(current, next, &block, &entry))
+		if (!findDirent(current, token, &block, &entry))
+		{
 			return -1;
+		}
 
-		dirent *entries = (dirent *)blockPtr(block);
+		dirent *entries = (dirent *)blockPtr(block) + entry;
                 if (entries[entry].type != 2)
+		{
                         return -1;
+		}
 
                 current = entries[entry].firstblock;
+		token = next;
+		next = strtok(NULL, "/");
 	}
-	return -1;
+
+	strcpy(child, token);
+	child[255] = '\0';
+
+	if (parent)
+	{
+		*parent = current;
+	}
+	
+	return current;
 }
 /*
 int lookupDirent(const char *path)
@@ -278,6 +294,7 @@ int lookupDirent(const char *path)
 */
 void makeDirectory(const char *path)
 {
+	/*
 	char child[256];
 	int parent = pathTraverse(path, child);
 	if (parent < 0)
@@ -285,30 +302,95 @@ void makeDirectory(const char *path)
 		fprintf(stdout, "bad path\n");
 		return;
 	}
-
-	int block, entry;
-	if (findDirent(parent, child, &block, &entry))
+	while (token)
 	{
-		fprintf(stdout, "directory is already here\n");
-		return;
-	}
-
-	int new = fatBlockFinder();
-	FAT[new] = USHRT_MAX;
-	memset(blockPtr(new), 0, BLOCKSIZE);
+		int block, entry;
+		if (findDirent(parent, child, &block, &entry))
+		{
+			fprintf(stdout, "directory is already here\n");
+			return;
+		}
 	
-	dirent d;
-        memset(&d, 0, sizeof(d));
-        strcpy(d.name, child);
-	d.name[255] = '\0';
-        d.type = 2;
-        d.size = 0;
-        d.firstblock = new;
-
+		int new = fatBlockFinder();
+		FAT[new] = USHRT_MAX;
+		memset(blockPtr(new), 0, BLOCKSIZE);
+		
+		dirent d;
+	        memset(&d, 0, sizeof(d));
+	       	strcpy(d.name, child);
+		d.name[255] = '\0';
+	        d.type = 2;
+	        d.size = 0;
+	        d.firstblock = new;
+	}
 	if (addDirent(parent, &d) != 0)
 	{
 		fprintf(stdout, "couldn't add directory!!!!\n");
 	}
+	*/
+
+ 	if (!path || path[0] != '/') 
+	{
+        	fprintf(stdout, "bad path\n");
+       		return;
+	}
+
+	char temp[strlen(path) + 1];
+	strcpy(temp, path);
+
+	int current = 0;  
+	char *token = strtok(temp + 1, "/");
+
+    	while (token) 
+	{
+
+        	int block, entry;
+
+        	if (findDirent(current, token, &block, &entry)) 
+		{
+        	    dirent *e = (dirent *)blockPtr(block) + entry;
+	
+	            if (e->type != 2) 
+		    {
+	                printf("'%s' exists but is not a directory!\n", token);
+	                return;
+		    }
+	
+        	    current = e->firstblock;  
+        }
+        else 
+	{
+		int newblk = fatBlockFinder();
+            	if (newblk < 0) 
+		{
+                	fprintf(stdout, "No space in FAT!\n");
+                	return;
+		}
+
+            	FAT[newblk] = USHRT_MAX;
+            	memset(blockPtr(newblk), 0, BLOCKSIZE);
+
+            	dirent d;
+            	memset(&d, 0, sizeof(d));
+            	strcpy(d.name, token);
+            	d.name[255] = '\0';
+		d.type = 2;
+            	d.size = 0;
+            	d.firstblock = newblk;
+
+            	if (addDirent(current, &d) != 0) 
+		{
+                	fprintf(stdout, "could not add directory '%s'\n", token);
+                	return;
+            	}
+
+            	current = newblk;
+        }
+
+        token = strtok(NULL, "/");
+    }
+
+    fprintf(stdout, "Created directory path: %s\n", path);
 
 }
 
@@ -318,7 +400,7 @@ void loadfs()
 
 	FAT = (unsigned short*)(fs + h->fatStart);
 
-	fprintf(stdout, "Loaded filesystem with FAT starting at %p\n", h->fatStart);
+	fprintf(stdout, "Loaded filesystem!\n");
 }
 
 void printChain(int start)
@@ -425,24 +507,33 @@ void addfilefs(char* fname)
 void addfilefs(char* fname)
 {
 	char child[256];
-	int parent = pathTraverse(fname, child);
+	int parent;
 
-	if (parent < 0)
+	if (pathTraverse(fname, child, &parent) < 0)
 	{
-		fprintf(stderr, "Invalid path!!!!!\n");
+		fprintf(stdout, "Invalid path!!!!!\n");
 	}
 
 	FILE* fileToAdd = fopen(child, "rb");
+	if (!fileToAdd)
+	{	
+		fprintf(stdout, "no file to add\n");
+		return;
+	}
 	struct stat fstat;
 	if (stat(child, &fstat) != 0)
 	{
-		perror("stat error");
+		fprintf(stdout, "stat error");
 		exit(1);
 	}
 
-	int fileSize = fstat.st_size;
+	int fileSize = (int)fstat.st_size;
 	int blocksNeeded = (fileSize + BLOCKSIZE - 1) / BLOCKSIZE;
 	int first = buildChain(blocksNeeded);
+	if (first < 0)
+	{
+		fprintf(stdout, "not enough space\n");
+	}
 
 	int current = first; //index of first data block
 	int remain = fileSize;	//# of bytes left
@@ -478,7 +569,13 @@ void addfilefs(char* fname)
 void removefilefs(char* fname)
 {
 	char child[256];
-	int parent = pathTraverse(fname, child);
+	int parent;
+
+	if (pathTraverse(fname, child, &parent) < 0)
+        {
+                fprintf(stdout, "no good path!!!!!\n");
+		return;
+        }
 
 	int block, entry;
 	if (!findDirent(parent, child, &block, &entry))
@@ -507,10 +604,10 @@ void removefilefs(char* fname)
 void extractfilefs(char* fname)
 {
 	char child[256];
-	int parent = pathTraverse(fname, child);
-	if (parent < 0) 
+	int parent;
+	if (pathTraverse(fname, child, &parent) < 0)
 	{
-	       	fprintf(stdout,"bad path\n"); 
+	       	fprintf(stdout,"path smells funny\n"); 
 		return; 
 	}
 

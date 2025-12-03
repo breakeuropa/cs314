@@ -26,5 +26,6 @@ void lsfs();
 void addfilefs(char* fname);
 void removefilefs(char* fname);
 void extractfilefs(char* fname);
+void makeDirectory(const char* fname);
 
 #endif
